@@ -12,6 +12,7 @@ dotenv.config();
 async function getAccessToken() {
   const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
   let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  console.log("DEBUG clientEmail:", clientEmail, "| privateKey present:", !!privateKey, "| privateKey length:", privateKey ? privateKey.length : 0);
 
   if (!clientEmail || !privateKey || privateKey.trim() === "" || clientEmail.includes("your-service-account")) {
     return null;
@@ -59,6 +60,9 @@ async function getAccessToken() {
     });
 
     const data = await res.json();
+    if (!data.access_token) {
+      console.error("[Google Drive] OAuth token request failed. Google responded with:", data);
+    }
     return data.access_token || null;
   } catch (err) {
     console.error("Failed to generate Google Drive access token:", err);
@@ -112,6 +116,7 @@ export async function uploadTarballToDrive(fileName, buffer) {
 
   if (!res.ok) {
     const errText = await res.text();
+    console.error("[Google Drive] File upload failed:", errText);
     throw new Error(`Google Drive upload failed (${res.status}): ${errText}`);
   }
 
