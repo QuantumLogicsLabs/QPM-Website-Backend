@@ -10,58 +10,30 @@ dotenv.config();
  */
 
 async function getAccessToken() {
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
 
-  if (!clientEmail || !privateKey || privateKey.trim() === "" || clientEmail.includes("your-service-account")) {
+  if (!clientId || !clientSecret || !refreshToken) {
     return null;
   }
 
   try {
-    privateKey = privateKey.replace(/\\n/g, "\n");
-
-    const header = { alg: "RS256", typ: "JWT" };
-    const now = Math.floor(Date.now() / 1000);
-    const claim = {
-      iss: clientEmail,
-      scope: "https://www.googleapis.com/auth/drive.file",
-      aud: "https://oauth2.googleapis.com/token",
-      exp: now + 3600,
-      iat: now
-    };
-
-    const b64url = (str) =>
-      Buffer.from(typeof str === "string" ? str : JSON.stringify(str))
-        .toString("base64")
-        .replace(/=/g, "")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
-
-    const unsignedToken = `${b64url(header)}.${b64url(claim)}`;
-
-    const crypto = await import("crypto");
-    const sign = crypto.createSign("RSA-SHA256");
-    sign.update(unsignedToken);
-    const signature = sign.sign(privateKey, "base64")
-      .replace(/=/g, "")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_");
-
-    const jwt = `${unsignedToken}.${signature}`;
-
     const res = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion: jwt
-      })
+        grant_type: "refresh_token",
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+      }),
     });
 
     const data = await res.json();
     return data.access_token || null;
   } catch (err) {
-    console.error("Failed to generate Google Drive access token:", err);
+    console.error("Failed to refresh Google OAuth access token:", err);
     return null;
   }
 }
