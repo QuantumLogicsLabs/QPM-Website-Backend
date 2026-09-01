@@ -52,18 +52,13 @@ GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAAS
 GOOGLE_DRIVE_FOLDER_ID=1a2b3c4d5e6f7g8h9i0j
 
 # Recap
-1
-Confirm .env has the client ID/secret first
-Make sure GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are already saved in your .env file (from the Cloud Console popup). The script reads them from there — if they're missing it'll exit immediately with an error telling you so.
-2
-Navigate to your project folder
-Open a terminal, cd into your backend project root (the folder that has package.json and .env in it — same level as server.js). Make sure the script file exists at src/scripts/get-refresh-token.js — create that folder/file if you haven't yet, using the code I gave earlier.
-3
-Run the script
-Run: node src/scripts/get-refresh-token.js You should see "Opening the Google consent screen in your browser..." printed, and a browser tab should pop open automatically. If it doesn't open on its own, copy the long URL printed right below that message and paste it into your browser manually.
-4
-Approve access in the browser
-Sign in with the same Gmail address you added as a "Test user" in the OAuth consent screen setup. Google will show a warning like "Google hasn't verified this app" — that's expected since it's in Testing mode. Click "Continue" (you may need to click "Advanced" first to see that option), then approve the Drive permission it asks for.
-5
-Copy the token from the terminal
+# 1 Confirm .env has the client ID/secret first
+Make sure GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are already saved in your .env file (from the Cloud Console popup). The script reads them from there — if they're missing it'll exit immediately with an error telling you so.<br>
+# 2 Navigate to your project folder
+Open a terminal, cd into your backend project root (the folder that has package.json and .env in it — same level as server.js). Make sure the script file exists at src/scripts/get-refresh-token.js — create that folder/file if you haven't yet, using the code I gave earlier.<br>
+# 3 Run the script
+Run: node src/scripts/get-refresh-token.js You should see "Opening the Google consent screen in your browser..." printed, and a browser tab should pop open automatically. If it doesn't open on its own, copy the long URL printed right below that message and paste it into your browser manually.<br>
+# 4 Approve access in the browser
+Sign in with the same Gmail address you added as a "Test user" in the OAuth consent screen setup. Google will show a warning like "Google hasn't verified this app" — that's expected since it's in Testing mode. Click "Continue" (you may need to click "Advanced" first to see that option), then approve the Drive permission it asks for.<br>
+# 5 Copy the token from the terminal
 After you approve, the browser tab will just say "Authorized — you can close this tab". Go back to your terminal — it will have printed a line like: GOOGLE_OAUTH_REFRESH_TOKEN=1//0gAbCdEfGhIjKlMn... Copy that whole line and paste it into your .env file.
