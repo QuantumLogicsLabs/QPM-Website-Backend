@@ -250,4 +250,136 @@ router.post("/publish", optionalAuthenticateToken, upload.single("file"), async 
   }
 });
 
+// POST /api/registry/publish-from-github - Publish a package by pulling it
+// straight from a public GitHub repo (no local .tgz needed).
+router.post("/publish-from-github", optionalAuthenticateToken, async (req, res) => {
+  try {
+    const { repoUrl, branch, version, dependencies } = req.body;
+
+    if (!repoUrl || !version) {
+      return res.status(400).json({ error: "repoUrl and version are required." });
+    }
+
+    // Parse "https://github.com/owner/repo" (also tolerates a trailing
+    // .git or slash) into { owner, repo }.
+    const match = repoUrl
+      .trim()
+      .match(/github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?\/?$/i);
+    if (!match) {
+      return res.status(400).json({ error: "repoUrl doesn't look like a GitHub repo URL." });
+    }
+    const [, owner, repo] = match;
+    const ref = branch || "main";
+
+    // 1. Read qpm.json from the repo for name/description/keywords, if present.
+    let manifest = {};
+    const manifestRes = await fetch(
+      `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/qpm.json`
+    );
+    if (manifestRes.ok) {
+      manifest = await manifestRes.json();
+    }
+
+    // 2. Read the repo's README to use as the package's article/description.
+    let readme = "";
+    const readmeRes = await fetch(
+      `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/README.md`
+    );
+    if (readmeRes.ok) {
+      readme = await readmeRes.text();
+    }
+
+    const name = (manifest.name || repo).toLowerCase().trim();
+    const description = manifest.description || "";
+    let keywords = manifest.tags || manifest.keywords || [];
+    if (typeof keywords === "string") {
+      keywords = keywords.split(",").map((k) => k.trim()).filter(Boolean);
+    }
+
+    // 3. Download the repo itself as a .tar.gz straight from GitHub — this
+    // becomes the package's tarball, same as an uploaded .tgz would.
+    const tarballRes = await fetch(
+      `https://codeload.github.com/${owner}/${repo}/tar.gz/refs/heads/${ref}`
+    );
+    if (!tarballRes.ok) {
+      return res.status(400).json({
+        error: `Could not download ${owner}/${repo}@${ref} from GitHub (HTTP ${tarballRes.status}). Check the repo is public and the branch name is right.`,
+      });
+    }
+    const fileBuffer = Buffer.from(await tarballRes.arrayBuffer());
+
+    let parsedDeps = {};
+    if (typeof dependencies === "string") {
+      try {
+        parsedDeps = JSON.parse(dependencies);
+      } catch {
+        parsedDeps = {};
+      }
+    } else if (dependencies && typeof dependencies === "object") {
+      parsedDeps = dependencies;
+    }
+
+    // --- from here down mirrors /publish's Package/PackageVersion logic ---
+    let existingPkg = await Package.findOne({ name });
+    const currentUserId = req.user ? req.user._id : null;
+
+    if (existingPkg && existingPkg.owner && currentUserId) {
+      if (existingPkg.owner.toString() !== currentUserId.toString()) {
+        return res.status(403).json({ error: `Package "${name}" belongs to another author.` });
+      }
+    }
+
+    if (!existingPkg) {
+      existingPkg = new Package({
+        name,
+        description,
+        keywords,
+        license: manifest.license || "MIT",
+        repository: repoUrl,
+        homepage: manifest.homepage || repoUrl,
+        readme: readme || `# ${name}\n\n${description || "No documentation provided."}`,
+        latestVersion: version,
+        owner: currentUserId,
+      });
+      await existingPkg.save();
+    } else {
+      const existingVer = await PackageVersion.findOne({ package: existingPkg._id, version });
+      if (existingVer) {
+        return res.status(400).json({ error: `Version ${version} of package "${name}" is already published.` });
+      }
+
+      existingPkg.description = description || existingPkg.description;
+      existingPkg.keywords = keywords.length ? keywords : existingPkg.keywords;
+      existingPkg.repository = repoUrl;
+      existingPkg.latestVersion = version;
+      if (readme) existingPkg.readme = readme;
+      await existingPkg.save();
+    }
+
+    const tarballName = `${name.replace("/", "-")}-${version}.tgz`;
+    const driveResult = await uploadTarballToDrive(tarballName, fileBuffer);
+
+    const packageVersion = new PackageVersion({
+      package: existingPkg._id,
+      version,
+      description,
+      dependencies: parsedDeps,
+      readme,
+      tarballName,
+      driveFileId: driveResult.id,
+      fileSize: driveResult.size,
+      publishedBy: currentUserId,
+    });
+    await packageVersion.save();
+
+    return res.status(201).json({
+      message: `Package ${name}@${version} imported from ${owner}/${repo} and stored in Google Drive!`,
+      package: { name, version, driveFileId: driveResult.id, size: driveResult.size },
+    });
+  } catch (err) {
+    console.error("Publish-from-GitHub error:", err);
+    return res.status(500).json({ error: err.message || "Failed to publish from GitHub." });
+  }
+});
+
 export default router;
