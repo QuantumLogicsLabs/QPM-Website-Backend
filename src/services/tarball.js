@@ -55,7 +55,7 @@ export function createTgz(files) {
   return zlib.gzipSync(Buffer.concat(parts));
 }
 
-const IGNORED_SEGMENTS = new Set([".git", "node_modules", ".DS_Store"]);
+const IGNORED_SEGMENTS = new Set([".git", "node_modules", "quantum_qubits", ".DS_Store"]);
 
 /** Normalises a client-supplied relative path; returns null if it is unsafe or ignored. */
 export function cleanPath(raw) {
